@@ -21,7 +21,7 @@
 
 4. Запустите сервис с помощью команды:
    ```cmd
-   go run .\cmd\calc_service\...
+   go run main.go
    ```
 
 5. Сервис будет доступен по адресу: [http://localhost:8080](http://localhost:8080)
