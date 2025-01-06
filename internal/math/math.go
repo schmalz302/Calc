@@ -1,21 +1,23 @@
-package main
+package math
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"net/http"
 	"strconv"
-	"strings"
 	"unicode"
 )
 
+// Calc вычисляет значение математического выражения в строке.
 func Calc(expression string) (float64, error) {
+	if len(expression) == 0 {
+		return 0, errors.New("invalid expression")
+	}
+	// Преобразуем выражение в постфиксную нотацию
 	postfix, err := toPostfix(expression)
 	if err != nil {
-		return 0, err
+		return 0,  errors.New("invalid expression")
 	}
 
+	// Вычисляем значение выражения в постфиксной нотации
 	result, err := evalPostfix(postfix)
 	if err != nil {
 		return 0, err
@@ -24,6 +26,7 @@ func Calc(expression string) (float64, error) {
 	return result, nil
 }
 
+// toPostfix преобразует инфиксное выражение в постфиксную (обратную польскую) нотацию.
 func toPostfix(expression string) ([]string, error) {
 	var output []string
 	var stack []rune
@@ -34,12 +37,11 @@ func toPostfix(expression string) ([]string, error) {
 		'/': 2,
 	}
 
-	expression = strings.ReplaceAll(expression, " ", "")
-
 	for i := 0; i < len(expression); i++ {
 		char := rune(expression[i])
 
 		if unicode.IsDigit(char) {
+			// Чтение числа
 			num := string(char)
 			for i+1 < len(expression) && unicode.IsDigit(rune(expression[i+1])) {
 				i++
@@ -49,6 +51,7 @@ func toPostfix(expression string) ([]string, error) {
 		} else if char == '(' {
 			stack = append(stack, char)
 		} else if char == ')' {
+			// Выгружаем все операторы до открывающей скобки
 			for len(stack) > 0 && stack[len(stack)-1] != '(' {
 				output = append(output, string(stack[len(stack)-1]))
 				stack = stack[:len(stack)-1]
@@ -56,18 +59,20 @@ func toPostfix(expression string) ([]string, error) {
 			if len(stack) == 0 || stack[len(stack)-1] != '(' {
 				return nil, errors.New("mismatched parentheses")
 			}
-			stack = stack[:len(stack)-1]
-		} else if precedence[char] > 0 {
+			stack = stack[:len(stack)-1] // удаляем '('
+		} else if char == '+' || char == '-' || char == '*' || char == '/' {
+			// Выгружаем операторы с более высоким приоритетом
 			for len(stack) > 0 && stack[len(stack)-1] != '(' && precedence[stack[len(stack)-1]] >= precedence[char] {
 				output = append(output, string(stack[len(stack)-1]))
 				stack = stack[:len(stack)-1]
 			}
 			stack = append(stack, char)
-		} else {
+		} else if !unicode.IsSpace(char) {
 			return nil, errors.New("invalid character in expression")
 		}
 	}
 
+	// Перенос оставшихся операторов в выходную очередь
 	for len(stack) > 0 {
 		if stack[len(stack)-1] == '(' {
 			return nil, errors.New("mismatched parentheses")
@@ -79,6 +84,7 @@ func toPostfix(expression string) ([]string, error) {
 	return output, nil
 }
 
+// evalPostfix вычисляет значение выражения в постфиксной нотации.
 func evalPostfix(postfix []string) (float64, error) {
 	var stack []float64
 
@@ -86,10 +92,12 @@ func evalPostfix(postfix []string) (float64, error) {
 		if num, err := strconv.ParseFloat(token, 64); err == nil {
 			stack = append(stack, num)
 		} else {
+			// Обработка операторов
 			if len(stack) < 2 {
 				return 0, errors.New("invalid expression")
 			}
 
+			// Извлекаем два операнда
 			b := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 			a := stack[len(stack)-1]
@@ -118,56 +126,4 @@ func evalPostfix(postfix []string) (float64, error) {
 	}
 
 	return stack[0], nil
-}
-
-type Request struct {
-	Expression string `json:"expression"`
-}
-
-type Response struct {
-	Result string `json:"result"`
-}
-
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
-func main() {
-	http.HandleFunc("/api/v1/calculate", calculateHandler)
-	fmt.Println("Server is running on http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
-}
-
-func calculateHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req Request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErrorResponse(w, "Expression is not valid", http.StatusUnprocessableEntity)
-		return
-	}
-
-	result, err := Calc(req.Expression)
-	if err != nil {
-		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "mismatched") {
-			writeErrorResponse(w, "Expression is not valid", http.StatusUnprocessableEntity)
-		} else {
-			writeErrorResponse(w, "Internal server error", http.StatusInternalServerError)
-		}
-		return
-	}
-
-	response := Response{Result: fmt.Sprintf("%v", result)}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
-}
-
-func writeErrorResponse(w http.ResponseWriter, message string, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(ErrorResponse{Error: message})
 }

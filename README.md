@@ -1,113 +1,98 @@
 # Сервис для вычисления арифметических выражений
-
 ## Описание
 
 Сервис предназначен для вычисления арифметических выражений, отправленных через HTTP POST запрос. Пользователь отправляет выражение в теле запроса, а сервис возвращает результат вычисления или сообщение об ошибке.
+
+## Структура проекта
+```
+.
+│   go.mod
+│   README.md
+│
+├───cmd
+│       main.go
+│
+└───internal
+    ├───api
+    │       api.go
+    │       api_test.go
+    │
+    └───math
+            math.go
+            math_test.go
+```
 
 ## Как запустить
 
 1. Убедитесь, что у вас установлен Go версии 1.19 или выше.
 
-2. Клонируйте этот репозиторий:
+2. Клонируйте этот репозиторий и перейдите в него:
    ```cmd
-   git clone <repository_url>
-   cd <repository_directory>
+   git clone https://github.com/schmalz302/Calc
+   cd Calc
    ```
 
 3. Запустите сервис с помощью команды:
    ```cmd
-   go run main.go
+   go run cmd/main.go
    ```
 
 4. Сервис будет доступен по адресу: [http://localhost:8080](http://localhost:8080)
 
 ## Использование
-
-Сервис предоставляет один эндпоинт:
-
-- **URL**: `/api/v1/calculate`
-- **Метод**: `POST`
-- **Тело запроса** (JSON):
-  ```json
-  {
-    "expression": "арифметическое выражение"
-  }
-  ```
-
-Пример запроса с использованием `curl` в Windows:
-
-### Однострочная команда
-```cmd
-curl --location http://localhost:8080/api/v1/calculate --header "Content-Type: application/json" --data "{ \"expression\": \"2+2*2\" }"
-```
-
-### Многострочная команда с использованием `^` для переноса строк
-```cmd
-curl --location http://localhost:8080/api/v1/calculate ^
---header "Content-Type: application/json" ^
---data "{ \"expression\": \"2+2*2\" }"
-```
-
-### Возможные ответы
-
-#### Успешное вычисление
-- **Код ответа**: `200 OK`
-- **Пример тела ответа**:
-  ```json
-  {
-    "result": "6"
-  }
-  ```
-
-#### Некорректное выражение
-- **Код ответа**: `422 Unprocessable Entity`
-- **Пример тела ответа**:
-  ```json
-  {
-    "error": "Expression is not valid"
-  }
-  ```
-
-#### Внутренняя ошибка сервера
-- **Код ответа**: `500 Internal Server Error`
-- **Пример тела ответа**:
-  ```json
-  {
-    "error": "Internal server error"
-  }
-  ```
-
-## Примеры запросов
-
-- Успешный запрос:
-  ```cmd
-  curl --location http://localhost:8080/api/v1/calculate --header "Content-Type: application/json" --data "{ \"expression\": \"10/2+5\" }"
-  ```
-
-  Ответ:
-  ```json
-  {
-    "result": "10"
-  }
-  ```
-
-- Некорректное выражение:
-  ```cmd
-  curl --location http://localhost:8080/api/v1/calculate --header "Content-Type: application/json" --data "{ \"expression\": \"2+2a\" }"
-  ```
-
-  Ответ:
-  ```json
-  {
-    "error": "Expression is not valid"
-  }
-  ```
-
-- Внутренняя ошибка сервера:
-  Чтобы смоделировать, можно отправить некорректные данные, которые вызывают ошибку обработки.
-
-## Тестирование
-
 Рекомендуется использовать `curl`, Postman или аналогичный инструмент для проверки работы сервиса. Проверьте все сценарии: корректные выражения, некорректные данные и симуляцию внутренних ошибок.
 
+## Сценарии использования
 
+| **Request Method** | **Endpoint** | **Request Body**                                           | **Response Body**                                    | **HTTP Status Code** |
+|--------------------|--------------|------------------------------------------------------------|------------------------------------------------------|----------------------|
+| POST               | `/api/v1/calculate`  | `{ "expression": "2 + 2" }`                               | `{ "result": 4 }`                                    | 200 OK               |
+| POST               | `/api/v1/calculate`  | `{ "expression": "2 / 0" }`                               | `{"error": "Internal server error"}`                 | 500 Internal Server Error |
+| POST               | `/api/v1/calculate`  | `{ "expression": "invalid expression" }`                  | `{ "error": "Invalid expression" }`                  | 422 Unprocessable Entity |
+| POST               | `/api/v1/calculate`  | `{ "expression": }`                                       | `{ "error": "Invalid request body" }`                | 400 Bad Request      |
+| POST               | `/api/v1/calculate`  | `non-json string`                                         | `{ "error": "Invalid request body" }`                | 400 Bad Request      |
+| GET                | `/api/v1/calculate`  | N/A                                                       | `{ "error":"Method not allowed" }`                | 405 Method Not Allowed |
+
+## Коды ответов
+- 200: Успешное вычисление
+- 422: Ошибка в выражении (неверный формат)
+- 500: Внутренняя ошибка сервера
+- 405: Неверный метод запроса (только POST разрешен)
+## Тестирование
+тесты math 
+```bash
+go test ./internal/math/
+```
+тесты api 
+```bash
+go test  ./internal/api/
+```
+тесты math с подробной информацией  
+```bash
+go test -v ./internal/math/
+```
+тесты api с подробной информацией  
+```bash
+go test -v ./internal/api/
+```
+запуск всех тестов
+```bash
+go test ./...
+```
+запуск всех тестов c подробной информацией
+```bash
+go -v test ./...
+```
+запуск тестов с информации о покрытии
+```bash
+go test -cover ./...
+```
+
+### Уточнения 
+
+- файл main не тестировал, тк при запуске сервера мы не вводим порт и другие данные, валидировать особо нечего, при запуске сервера все должно отработать корректно
+
+- покрытие тестами 95.2% - пакет math, 90.0% - пакет api
+- сценарии использования оформил в виде таблице, тк это удобно
+
+- тг ```@bll_nev_egor```
